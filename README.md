@@ -37,6 +37,10 @@ Alternatively, you can embed the image in BinaryData:
 - **Mix**: Controls the blend between original and pitch-shifted signal (0-100%)
 - **Feedback**: Adds regeneration to the pitch-shifted signal (0-50%)
 
+## License
+
+Copyright 2025 CK Audio Design
+
 ## Technical Details
 
 The pitch shifter uses a delay-based algorithm with linear interpolation for smooth pitch changes. The implementation is optimized for real-time performance and provides low latency operation.
