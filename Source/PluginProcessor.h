@@ -66,6 +66,11 @@ public:
     std::atomic<float>* mixParam = nullptr;
     std::atomic<float>* feedbackParam = nullptr;
     std::atomic<float>* harmonizerParam = nullptr;
+    std::atomic<float>* powerParam = nullptr;
+    std::atomic<float>* crushParam = nullptr;
+    std::atomic<float>* gurnParam = nullptr;
+    std::atomic<float>* leftCornerParam = nullptr;
+    std::atomic<float>* rightCornerParam = nullptr;
 
 private:
     //==============================================================================

@@ -158,6 +158,11 @@ NoctaveAudioProcessor::NoctaveAudioProcessor()
     mixParam = apvts.getRawParameterValue("MIX");
     feedbackParam = apvts.getRawParameterValue("FEEDBACK");
     harmonizerParam = apvts.getRawParameterValue("HARMONIZER");
+    powerParam = apvts.getRawParameterValue("POWER");
+    crushParam = apvts.getRawParameterValue("CRUSH");
+    gurnParam = apvts.getRawParameterValue("GURN");
+    leftCornerParam = apvts.getRawParameterValue("LEFT_CORNER");
+    rightCornerParam = apvts.getRawParameterValue("RIGHT_CORNER");
 }
 
 NoctaveAudioProcessor::~NoctaveAudioProcessor()
@@ -279,6 +284,10 @@ void NoctaveAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
+    // Power off = bypass: pass through input to output without processing
+    if (powerParam != nullptr && powerParam->load() < 0.5f)
+        return;
+
     // Get parameter values
     float pitchShift = pitchShiftParam->load();
     float mix = mixParam->load();
@@ -336,6 +345,48 @@ void NoctaveAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
                 // Final hard limit (more conservative)
                 mixed = juce::jlimit (-0.9f, 0.9f, mixed);
                 singleChannelBuffer.setSample (0, sample, mixed);
+            }
+        }
+
+        // Apply button effects (crush, gurn, corner buttons)
+        bool crushOn = crushParam != nullptr && crushParam->load() >= 0.5f;
+        bool gurnOn = gurnParam != nullptr && gurnParam->load() >= 0.5f;
+        bool leftCornerOn = leftCornerParam != nullptr && leftCornerParam->load() >= 0.5f;
+        bool rightCornerOn = rightCornerParam != nullptr && rightCornerParam->load() >= 0.5f;
+
+        if (crushOn || gurnOn || leftCornerOn || rightCornerOn)
+        {
+            for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+            {
+                float s = singleChannelBuffer.getSample (0, sample);
+
+                if (crushOn)
+                {
+                    // Bit crusher: reduce to ~8-bit for lo-fi character
+                    constexpr float crushLevels = 128.0f;
+                    s = std::round (s * crushLevels) / crushLevels;
+                }
+
+                if (gurnOn)
+                {
+                    // Saturation/grit: soft clipping waveshaper
+                    s = std::tanh (s * 2.5f);
+                }
+
+                if (leftCornerOn)
+                {
+                    // Warm/dark: subtle soft saturation with low-mid emphasis
+                    s = std::tanh (s * 1.5f) * 1.1f;
+                }
+
+                if (rightCornerOn)
+                {
+                    // Bright: subtle presence boost
+                    float presence = s * 1.3f;
+                    s = juce::jlimit (-0.95f, 0.95f, presence);
+                }
+
+                singleChannelBuffer.setSample (0, sample, juce::jlimit (-0.95f, 0.95f, s));
             }
         }
         
@@ -405,6 +456,20 @@ juce::AudioProcessorValueTreeState::ParameterLayout NoctaveAudioProcessor::creat
         juce::NormalisableRange<float> (-12.0f, 12.0f, 1.0f),
         0.0f, "semitones"
     ));
+
+    // Power: on/off (bypass when off)
+    params.push_back (std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID ("POWER", 1), "Power", true));
+
+    // Triangle buttons
+    params.push_back (std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID ("CRUSH", 1), "Crush", false));
+    params.push_back (std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID ("GURN", 1), "Gurn", false));
+    params.push_back (std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID ("LEFT_CORNER", 1), "Left Corner", false));
+    params.push_back (std::make_unique<juce::AudioParameterBool>(
+        juce::ParameterID ("RIGHT_CORNER", 1), "Right Corner", false));
 
     return { params.begin(), params.end() };
 }
