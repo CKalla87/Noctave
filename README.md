@@ -41,3 +41,7 @@ Alternatively, you can embed the image in BinaryData:
 
 The pitch shifter uses a delay-based algorithm with linear interpolation for smooth pitch changes. The implementation is optimized for real-time performance and provides low latency operation.
 
+## License
+
+Copyright 2025 CK Audio Design
+
