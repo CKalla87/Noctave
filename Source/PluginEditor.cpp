@@ -547,6 +547,7 @@ NoctaveAudioProcessorEditor::NoctaveAudioProcessorEditor (NoctaveAudioProcessor&
         setSize (kEditorWidth, kEditorHeight);
 
     pitchAAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "PITCH_SHIFT", pitchASlider);
+    pitchBAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "PITCH_SHIFT_B", pitchBSlider);
     harmonizerAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "HARMONIZER", harmonizerSlider);
     mixAttachment = std::make_unique<SliderAttachment> (audioProcessor.apvts, "MIX", mixSlider);
     crushAttachment = std::make_unique<ButtonAttachment> (audioProcessor.apvts, "CRUSH", crushButton);

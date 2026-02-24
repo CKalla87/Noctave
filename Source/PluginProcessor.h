@@ -63,6 +63,7 @@ public:
 
     // Pitch shifter parameters
     std::atomic<float>* pitchShiftParam = nullptr;
+    std::atomic<float>* pitchShiftBParam = nullptr;
     std::atomic<float>* mixParam = nullptr;
     std::atomic<float>* feedbackParam = nullptr;
     std::atomic<float>* harmonizerParam = nullptr;
@@ -84,7 +85,8 @@ private:
         void processBlock (juce::AudioBuffer<float>& buffer, float pitchShiftSemitones, float mix, float feedback);
         
     private:
-        static constexpr int maxDelaySamples = 44100; // 1 second at 44.1kHz
+        static constexpr int minReadWriteSamples = 2048; // Prevent read/write collision
+        int maxDelaySamples = 88200; // Set in prepare() based on sample rate
         
         struct Voice
         {

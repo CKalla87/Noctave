@@ -118,6 +118,7 @@ private:
     std::unique_ptr<juce::LookAndFeel_V4> bigKnobLookAndFeel;
     std::unique_ptr<juce::LookAndFeel_V4> smallKnobLookAndFeel;
     std::unique_ptr<SliderAttachment> pitchAAttachment;
+    std::unique_ptr<SliderAttachment> pitchBAttachment;
     std::unique_ptr<SliderAttachment> harmonizerAttachment;
     std::unique_ptr<SliderAttachment> mixAttachment;
     std::unique_ptr<ButtonAttachment> crushAttachment;

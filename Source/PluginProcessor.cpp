@@ -15,18 +15,20 @@
 
 NoctaveAudioProcessor::PitchShifter::PitchShifter()
 {
-    voices[0].delayBuffer.setSize (1, maxDelaySamples);
+    voices[0].delayBuffer.setSize (1, 88200);
     voices[0].delayBuffer.clear();
 }
 
 void NoctaveAudioProcessor::PitchShifter::prepare (double sampleRate, int maxBlockSize)
 {
     currentSampleRate = sampleRate;
+    maxDelaySamples = static_cast<int> (sampleRate * 2.0); // 2 seconds of delay
+    maxDelaySamples = juce::jmax (maxDelaySamples, 44100);
     
     voices[0].delayBuffer.setSize (1, maxDelaySamples);
     voices[0].delayBuffer.clear();
     voices[0].writePosition = maxDelaySamples * 0.5f; // Start at middle of buffer
-    voices[0].readPosition = maxDelaySamples * 0.5f;
+    voices[0].readPosition = maxDelaySamples * 0.5f - minReadWriteSamples; // Offset read to prevent collision
     
     smoothedPitchShift = 0.0f;
 }
@@ -35,7 +37,7 @@ void NoctaveAudioProcessor::PitchShifter::reset()
 {
     voices[0].delayBuffer.clear();
     voices[0].writePosition = maxDelaySamples * 0.5f;
-    voices[0].readPosition = maxDelaySamples * 0.5f;
+    voices[0].readPosition = maxDelaySamples * 0.5f - minReadWriteSamples;
 }
 
 
@@ -72,14 +74,22 @@ void NoctaveAudioProcessor::PitchShifter::processBlock (juce::AudioBuffer<float>
         // Calculate read position based on pitch ratio
         // When pitchRatio > 1 (shift up), read moves faster than write (read decrements more)
         // When pitchRatio < 1 (shift down), read moves slower than write (read decrements less)
-        // Read position moves backwards relative to write
         voice.readPosition -= pitchRatio;
         
-        // Wrap read position
-        while (voice.readPosition < 0.0f)
+        // Wrap read position (use fmod-style wrap to avoid precision issues)
+        voice.readPosition = std::fmod (voice.readPosition, static_cast<float> (maxDelaySamples));
+        if (voice.readPosition < 0.0f)
             voice.readPosition += maxDelaySamples;
-        while (voice.readPosition >= maxDelaySamples)
-            voice.readPosition -= maxDelaySamples;
+        
+        // Prevent read/write collision: keep read at least minReadWriteSamples behind write
+        float delaySamples = voice.writePosition - voice.readPosition;
+        if (delaySamples <= 0.0f) delaySamples += maxDelaySamples;
+        if (delaySamples < minReadWriteSamples)
+        {
+            voice.readPosition = voice.writePosition - minReadWriteSamples;
+            if (voice.readPosition < 0.0f)
+                voice.readPosition += maxDelaySamples;
+        }
         
         // Linear interpolation for smooth reading
         int readPosInt = static_cast<int> (voice.readPosition);
@@ -155,6 +165,7 @@ NoctaveAudioProcessor::NoctaveAudioProcessor()
 {
     // Get parameter pointers
     pitchShiftParam = apvts.getRawParameterValue("PITCH_SHIFT");
+    pitchShiftBParam = apvts.getRawParameterValue("PITCH_SHIFT_B");
     mixParam = apvts.getRawParameterValue("MIX");
     feedbackParam = apvts.getRawParameterValue("FEEDBACK");
     harmonizerParam = apvts.getRawParameterValue("HARMONIZER");
@@ -288,8 +299,9 @@ void NoctaveAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
     if (powerParam != nullptr && powerParam->load() < 0.5f)
         return;
 
-    // Get parameter values
-    float pitchShift = pitchShiftParam->load();
+    // Get parameter values (Pitch A for L, Pitch B for R - mono uses Pitch A)
+    float pitchShiftL = pitchShiftParam != nullptr ? pitchShiftParam->load() : 0.0f;
+    float pitchShiftR = pitchShiftBParam != nullptr ? pitchShiftBParam->load() : pitchShiftL;
     float mix = mixParam->load();
     float feedback = feedbackParam->load();
     float harmonizerInterval = harmonizerParam->load();
@@ -305,8 +317,9 @@ void NoctaveAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
         juce::AudioBuffer<float> originalBuffer (1, buffer.getNumSamples());
         originalBuffer.copyFrom (0, 0, buffer, channel, 0, buffer.getNumSamples());
         
-        // Process the channel with pitch shifter
-        pitchShifters[channel].processBlock (singleChannelBuffer, pitchShift, mix, feedback);
+        // Process the channel with pitch shifter (L = Pitch A, R = Pitch B)
+        float pitchForChannel = (channel == 0) ? pitchShiftL : pitchShiftR;
+        pitchShifters[channel].processBlock (singleChannelBuffer, pitchForChannel, mix, feedback);
         
         // Process harmonizer if interval is not zero
         if (std::abs (harmonizerInterval) > 0.1f)
@@ -393,6 +406,10 @@ void NoctaveAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
         // Copy processed audio back to main buffer
         buffer.copyFrom (channel, 0, singleChannelBuffer, 0, 0, buffer.getNumSamples());
     }
+    
+    // Mono in / stereo out: duplicate L to R so both speakers have sound
+    if (totalNumInputChannels == 1 && totalNumOutputChannels >= 2)
+        buffer.copyFrom (1, 0, buffer, 0, 0, buffer.getNumSamples());
 }
 
 //==============================================================================
@@ -429,9 +446,15 @@ juce::AudioProcessorValueTreeState::ParameterLayout NoctaveAudioProcessor::creat
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
 
-    // Pitch Shift: -24 to +24 semitones (-2 to +2 octaves, like DigiTech Whammy)
+    // Pitch Shift A (left / mono): -24 to +24 semitones
     params.push_back (std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID ("PITCH_SHIFT", 1), "Pitch Shift",
+        juce::ParameterID ("PITCH_SHIFT", 1), "Pitch A",
+        juce::NormalisableRange<float> (-24.0f, 24.0f, 0.1f),
+        0.0f, "semitones"
+    ));
+    // Pitch Shift B (right channel for stereo width)
+    params.push_back (std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID ("PITCH_SHIFT_B", 1), "Pitch B",
         juce::NormalisableRange<float> (-24.0f, 24.0f, 0.1f),
         0.0f, "semitones"
     ));
