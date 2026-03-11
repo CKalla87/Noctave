@@ -269,15 +269,14 @@ bool NoctaveAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) 
     juce::ignoreUnused (layouts);
     return true;
   #else
-    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
-     && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+    // Effect: allow mono and stereo; require input and output layouts to match
+    auto out = layouts.getMainOutputChannelSet();
+    if (out != juce::AudioChannelSet::mono() && out != juce::AudioChannelSet::stereo())
         return false;
-
    #if ! JucePlugin_IsSynth
-    if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
+    if (layouts.getMainInputChannelSet() != out)
         return false;
    #endif
-
     return true;
   #endif
 }
@@ -406,10 +405,6 @@ void NoctaveAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce
         // Copy processed audio back to main buffer
         buffer.copyFrom (channel, 0, singleChannelBuffer, 0, 0, buffer.getNumSamples());
     }
-    
-    // Mono in / stereo out: duplicate L to R so both speakers have sound
-    if (totalNumInputChannels == 1 && totalNumOutputChannels >= 2)
-        buffer.copyFrom (1, 0, buffer, 0, 0, buffer.getNumSamples());
 }
 
 //==============================================================================

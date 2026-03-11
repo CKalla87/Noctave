@@ -2,11 +2,12 @@
 
 <JUCERPROJECT id="Noctave1" name="Noctave" projectType="audioplug" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" cppLanguageStandard="17"
-              pluginChannelConfigs="{2, 2}" companyWebsite="www.example.com"
+              pluginChannelConfigs="{1, 1}, {2, 2}" companyWebsite="www.example.com"
               companyName="CK Audio Design" companyCopyright="2025" pluginManufacturerCode="CKAD"
               pluginCode="Nctv" pluginName="Noctave" pluginDesc="Vampire-Themed Octave Pitch Shifter"
               pluginFormats="buildVST3,buildAU,buildAAX"
-              aaxIdentifier="com.ckaudiodesign.noctave">
+              aaxIdentifier="com.ckaudiodesign.noctave"
+              pluginAAXCategory="4">
   <MAINGROUP id="jXVMvd" name="Noctave">
     <GROUP id="{9599FCC3-1EB7-A668-23ED-93BE4AF42C8A}" name="Source">
       <FILE id="gYswd1" name="PluginProcessor.cpp" compile="1" resource="0"
@@ -25,7 +26,7 @@
     <XCODE_MAC targetFolder="Builds/MacOSX">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug" targetName="Noctave"/>
-        <CONFIGURATION isDebug="0" name="Release" targetName="Noctave"/>
+        <CONFIGURATION isDebug="0" name="Release" targetName="Noctave" enablePluginBinaryCopyStep="0"/>
       </CONFIGURATIONS>
       <MODULEPATHS>
         <MODULEPATH id="juce_audio_basics" path="../NebulaEQ/JUCE/modules"/>
